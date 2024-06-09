@@ -32,8 +32,12 @@ local default_config = {
 	use_shada = true,
 	keys = {
 		create = '<leader>pc',
-		-- delete = '<leader>pd',
+		delete = '<leader>pd',
 	},
+
+	pre_load_fn = function() end,
+	
+	post_load_fn = function() end,
 
 	open_file_fn = openFile
 }
@@ -54,12 +58,14 @@ SPM.load = function()
 		return
 	end
 
-	local cfg = {}
-	if vim.fn.filereadable(dir .. 'init.lua') ~= 0 then
-		local lcfg = dofile(dir .. 'init.lua')
-		cfg = vim.tbl_extend('force', SPM.config, lcfg or {})
-		-- TBD
+	if SPM.config.pre_load_fn then
+		SPM.config.pre_load_fn()
 	end
+	if vim.fn.filereadable(dir .. 'init.lua') ~= 0 then
+		vim.tbl_deep_extend('force', SPM.config, dofile(dir .. 'init.lua') or {})
+	end
+
+	local cfg = SPM.config
 
 	if cfg.use_shada then
 		vim.opt.shadafile = dir .. 'shada'
@@ -69,8 +75,7 @@ SPM.load = function()
 	if cfg.use_views then
 		vim.opt.viewdir = dir .. 'views/'
 		vim.api.nvim_create_autocmd('BufWritePre', { group = group, command = 'mkview' })
-		vim.api.nvim_create_autocmd({ 'BufReadPost', 'BufWritePost' },
-			{ group = group, command = 'silent! loadview' })
+		vim.api.nvim_create_autocmd('BufWinEnter', { group = group, command = 'silent! loadview' })
 	end
 
 
@@ -80,6 +85,9 @@ SPM.load = function()
 		end
 	end
 
+	if SPM.config.post_load_fn then
+		SPM.config.post_load_fn()
+	end
 	echo("Loaded")
 end
 
@@ -130,7 +138,7 @@ SPM.create = function()
 end
 
 SPM.delete = function()
-	-- not impl
+	vim.fn.system('rm -Rfv ' .. SPM.config.dir)
 end
 
 local function init_cwd()
@@ -154,6 +162,8 @@ local function init_cwd()
 end
 
 local function init(cfg)
+	vim.api.nvim_create_user_command("SPMCreate", SPM.create, { nargs = 0 })
+	vim.api.nvim_create_user_command("SPMDelete", SPM.delete, { nargs = 0 })
 	vim.api.nvim_create_autocmd('VimLeave',
 		{ pattern = '*', callback = SPM.save, desc = '[SPM] auto save session on exit', group = group })
 
@@ -161,17 +171,15 @@ local function init(cfg)
 		vim.keymap.set('n', cfg.keys.create, SPM.create, { desc = '[SPM] create / init project' })
 	end
 
-	-- if cfg.keys.delete ~= '' then
-	-- 	vim.keymap.set('n', cfg.keys.delete, SPM.delete, { desc = '[SPM] delete project' })
-	-- end
+	if cfg.keys.delete ~= '' then
+		vim.keymap.set('n', cfg.keys.delete, SPM.delete, { desc = '[SPM] delete project' })
+	end
 	return cfg
 end
 
 SPM.setup = function(config)
-	_G.CreateProject = SPM.create
-
 	local cfg = vim.tbl_deep_extend('force', default_config, config or {})
-	local cwd = vim.loop.cwd()
+	local cwd = vim.fn.getcwd()
 
 	if cfg.set_cwd then
 		cwd = init_cwd()
@@ -180,10 +188,10 @@ SPM.setup = function(config)
 	if string.sub(cfg.dir, 1, 1) ~= '/' then
 		cfg.dir = pp:new(cwd):joinpath(cfg.dir):absolute()
 	end
+
 	cfg.dir = vim.fs.normalize(cfg.dir) .. "/"
 
 	SPM.config = init(cfg)
 	vim.defer_fn(SPM.load, 100)
-	_G.SPM = SPM
 end
 return SPM
