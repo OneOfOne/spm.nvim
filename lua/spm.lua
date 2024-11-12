@@ -36,7 +36,6 @@ local default_config = {
 	},
 
 	pre_load_fn = function() end,
-	
 	post_load_fn = function() end,
 
 	open_file_fn = openFile
@@ -152,10 +151,10 @@ local function init_cwd()
 			end
 		end
 	end
-
+	print(dir)
 	if dir ~= '' then
 		dir = pp:new(dir):absolute()
-		vim.cmd('cd ' .. dir)
+		vim.api.nvim_set_current_dir(dir)
 	end
 
 	return dir
@@ -192,6 +191,6 @@ SPM.setup = function(config)
 	cfg.dir = vim.fs.normalize(cfg.dir) .. "/"
 
 	SPM.config = init(cfg)
-	vim.defer_fn(SPM.load, 100)
+	vim.defer_fn(SPM.load, 250)
 end
 return SPM
