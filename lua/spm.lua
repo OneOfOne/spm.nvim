@@ -60,6 +60,7 @@ SPM.load = function()
 	if SPM.config.pre_load_fn then
 		SPM.config.pre_load_fn()
 	end
+	
 	if vim.fn.filereadable(dir .. 'init.lua') ~= 0 then
 		vim.tbl_deep_extend('force', SPM.config, dofile(dir .. 'init.lua') or {})
 	end
@@ -73,7 +74,7 @@ SPM.load = function()
 
 	if cfg.use_views then
 		vim.opt.viewdir = dir .. 'views/'
-		vim.api.nvim_create_autocmd('BufWritePre', { group = group, command = 'mkview' })
+		vim.api.nvim_create_autocmd('BufWinLeave', { group = group, command = 'mkview' })
 		vim.api.nvim_create_autocmd('BufWinEnter', { group = group, command = 'silent! loadview' })
 	end
 
