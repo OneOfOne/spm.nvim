@@ -3,7 +3,21 @@ local group = vim.api.nvim_create_augroup('SPM', {})
 
 local SPM = {
 	config = {},
+	buffers = {},
+	files = {}
 }
+
+local exiting = false
+
+local function tbl_remove(tbl, val)
+	for i = #tbl, 1, -1 do
+		if tbl[i] == val then
+			table.remove(tbl, i)
+		end
+	end
+	return tbl
+end
+
 
 local function openFile(fn)
 	if vim.fn.filereadable(fn) ~= 0 then
@@ -60,7 +74,7 @@ SPM.load = function()
 	if SPM.config.pre_load_fn then
 		SPM.config.pre_load_fn()
 	end
-	
+
 	if vim.fn.filereadable(dir .. 'init.lua') ~= 0 then
 		vim.tbl_deep_extend('force', SPM.config, dofile(dir .. 'init.lua') or {})
 	end
@@ -76,7 +90,38 @@ SPM.load = function()
 		vim.opt.viewdir = dir .. 'views/'
 		vim.opt.viewoptions = 'cursor,folds'
 		vim.api.nvim_create_autocmd('BufWinLeave', { group = group, pattern = '?*', command = 'mkview' })
-		vim.api.nvim_create_autocmd('BufWinEnter', { group = group, pattern = '?*', command = 'silent! loadview' })
+		vim.api.nvim_create_autocmd('BufWinLeave', {
+			group = group,
+			pattern = '?*',
+			callback = function(args)
+				if vim.fn.filereadable(args.match) ~= 0 then
+					vim.cmd.mkview()
+				end
+			end
+		})
+		vim.api.nvim_create_autocmd('BufEnter', {
+			group = group,
+			pattern = '?*',
+			callback = function(args)
+				if vim.fn.filereadable(args.match) ~= 0 then
+					vim.cmd('silent! loadview')
+					tbl_remove(SPM.files, args.match)
+					table.insert(SPM.files, args.match)
+				end
+			end
+		})
+		vim.api.nvim_create_autocmd('BufDelete', {
+			group = group,
+			pattern = '?*',
+			callback = function(args)
+				if exiting then
+					return
+				end
+				tbl_remove(SPM.files, args.match)
+				-- vim.notify('DELETE ' ..  vim.inspect(args), 1)
+			end
+		})
+
 	end
 
 
@@ -109,13 +154,11 @@ SPM.save = function()
 	file:write('return {\n')
 
 	local ldir = dir:gsub('.nvim/$', '')
-	for _, h in ipairs(vim.api.nvim_list_bufs()) do
-		if vim.api.nvim_buf_is_loaded(h) then
-			local bname = vim.api.nvim_buf_get_name(h)
-			local name = '.' .. string.sub(bname, ldir:len())
-			if vim.fn.filereadable(name) ~= 0 then
-				file:write('\t"' .. name .. '",\n')
-			end
+	for _, fname in ipairs(SPM.files) do
+		local name = '.' .. string.sub(fname, ldir:len())
+		vim.notify(name, 1)
+		if vim.fn.filereadable(name) ~= 0 then
+			file:write('\t"' .. name .. '",\n')
 		end
 	end
 
@@ -136,10 +179,6 @@ SPM.create = function()
 	end
 
 	SPM.save()
-end
-
-SPM.delete = function()
-	vim.fn.system('rm -Rfv ' .. SPM.config.dir)
 end
 
 local function init_cwd()
@@ -164,17 +203,20 @@ end
 
 local function init(cfg)
 	vim.api.nvim_create_user_command("SPMCreate", SPM.create, { nargs = 0 })
-	vim.api.nvim_create_user_command("SPMDelete", SPM.delete, { nargs = 0 })
-	vim.api.nvim_create_autocmd('VimLeave',
-		{ pattern = '*', callback = SPM.save, desc = '[SPM] auto save session on exit', group = group })
+	vim.api.nvim_create_autocmd('QuitPre', {
+		pattern = '*',
+		desc = '[SPM] auto save session on exit',
+		group = group,
+		callback = function()
+			exiting = true
+			SPM.save()
+		end
+	})
 
 	if cfg.keys.create ~= '' then
 		vim.keymap.set('n', cfg.keys.create, SPM.create, { desc = '[SPM] create / init project' })
 	end
 
-	if cfg.keys.delete ~= '' then
-		vim.keymap.set('n', cfg.keys.delete, SPM.delete, { desc = '[SPM] delete project' })
-	end
 	return cfg
 end
 

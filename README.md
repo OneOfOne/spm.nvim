@@ -29,7 +29,6 @@ Install the plugin with your preferred package manager:
 			use_shada = true,
 			keys = {
 				create = '<leader>pc',
-				delete = '<leader>pd',
 			},
 
 			pre_load_fn = function() end,
