@@ -74,8 +74,9 @@ SPM.load = function()
 
 	if cfg.use_views then
 		vim.opt.viewdir = dir .. 'views/'
-		vim.api.nvim_create_autocmd('BufWinLeave', { group = group, command = 'mkview' })
-		vim.api.nvim_create_autocmd('BufWinEnter', { group = group, command = 'silent! loadview' })
+		vim.opt.viewoptions = 'cursor,folds'
+		vim.api.nvim_create_autocmd('BufWinLeave', { group = group, pattern = '?*', command = 'mkview' })
+		vim.api.nvim_create_autocmd('BufWinEnter', { group = group, pattern = '?*', command = 'silent! loadview' })
 	end
 
 
