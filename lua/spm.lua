@@ -89,7 +89,16 @@ SPM.load = function()
 	if cfg.use_views then
 		vim.opt.viewdir = dir .. 'views/'
 		vim.opt.viewoptions = 'cursor,folds'
-		vim.api.nvim_create_autocmd('BufWinLeave', { group = group, pattern = '?*', command = 'mkview' })
+		vim.api.nvim_create_autocmd('BufWinEnter', {
+			group = group,
+			pattern = '?*',
+			callback = function(args)
+				if vim.fn.filereadable(args.match) ~= 0 then
+					vim.cmd('silent! loadview')
+				end
+			end
+
+		})
 		vim.api.nvim_create_autocmd('BufWinLeave', {
 			group = group,
 			pattern = '?*',
@@ -104,7 +113,6 @@ SPM.load = function()
 			pattern = '?*',
 			callback = function(args)
 				if vim.fn.filereadable(args.match) ~= 0 then
-					vim.cmd('silent! loadview')
 					tbl_remove(SPM.files, args.match)
 					table.insert(SPM.files, args.match)
 				end
