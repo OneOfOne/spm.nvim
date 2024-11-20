@@ -3,11 +3,8 @@ local group = vim.api.nvim_create_augroup('SPM', {})
 
 local SPM = {
 	config = {},
-	buffers = {},
 	files = {}
 }
-
-local exiting = false
 
 local function tbl_remove(tbl, val)
 	for i = #tbl, 1, -1 do
@@ -19,17 +16,22 @@ local function tbl_remove(tbl, val)
 end
 
 
-local function openFile(fn)
+local function open_file(fn)
 	if vim.fn.filereadable(fn) ~= 0 then
-		if SPM.config.use_neotree then
-			require('neo-tree.utils').open_file({}, fn)
-		else
-			vim.cmd('e ' .. fn)
-		end
+		vim.cmd('e ' .. fn)
 	end
 end
 
-local function writefile(fn, text)
+local function is_local_file(fn) 
+	if not SPM.config.save_local_only then
+		return vim.fn.filereadable(fn) ~= 0
+	end
+	local dir = SPM.config.dir
+	local ldir = dir:gsub('.nvim/$', '')
+	return fn:find(ldir) ~= nil
+end
+
+local function write_file(fn, text)
 	local file = io.open(fn, 'w')
 	if not file then
 		return
@@ -41,32 +43,22 @@ end
 local default_config = {
 	dir = '.nvim',
 	set_cwd = true,
-	use_neotree = true,
 	use_views = true,
+	save_local_only = true,
 	use_shada = true,
 	keys = {
 		create = '<leader>pc',
-		delete = '<leader>pd',
 	},
 
 	pre_load_fn = function() end,
 	post_load_fn = function() end,
 
-	open_file_fn = openFile
+	open_file_fn = open_file
 }
-
-local function echo(msg)
-	-- Construct message chunks
-	msg = type(msg) == 'string' and { { msg } } or msg
-	table.insert(msg, 1, { '(SPM) ', 'WarningMsg' })
-
-	-- Echo. Force redraw to ensure that it is effective (`:h echo-redraw`)
-	vim.cmd([[echo '' | redraw]])
-	vim.api.nvim_echo(msg, true, {})
-end
 
 SPM.load = function()
 	local dir = SPM.config.dir
+
 	if vim.fn.isdirectory(dir) == 0 then
 		return
 	end
@@ -93,45 +85,43 @@ SPM.load = function()
 			group = group,
 			pattern = '?*',
 			callback = function(args)
-				if vim.fn.filereadable(args.match) ~= 0 then
+				if is_local_file(args.match) then
 					vim.cmd('silent! loadview')
 				end
 			end
 
 		})
+		
 		vim.api.nvim_create_autocmd('BufWinLeave', {
 			group = group,
 			pattern = '?*',
 			callback = function(args)
-				if vim.fn.filereadable(args.match) ~= 0 then
+				if is_local_file(args.match) then
 					vim.cmd.mkview()
 				end
-			end
-		})
-		vim.api.nvim_create_autocmd('BufEnter', {
-			group = group,
-			pattern = '?*',
-			callback = function(args)
-				if vim.fn.filereadable(args.match) ~= 0 then
-					tbl_remove(SPM.files, args.match)
-					table.insert(SPM.files, args.match)
-				end
-			end
-		})
-		vim.api.nvim_create_autocmd('BufDelete', {
-			group = group,
-			pattern = '?*',
-			callback = function(args)
-				if exiting then
-					return
-				end
-				tbl_remove(SPM.files, args.match)
-				-- vim.notify('DELETE ' ..  vim.inspect(args), 1)
 			end
 		})
 
 	end
 
+	vim.api.nvim_create_autocmd('BufEnter', {
+		group = group,
+		pattern = '?*',
+		callback = function(args)
+			if is_local_file(args.match) then
+				tbl_remove(SPM.files, args.match)
+				table.insert(SPM.files, args.match)
+			end
+		end
+	})
+
+	vim.api.nvim_create_autocmd('BufDelete', {
+		group = group,
+		pattern = '?*',
+		callback = function(args)
+			tbl_remove(SPM.files, args.match)
+		end
+	})
 
 	if vim.fn.filereadable(dir .. 'session.lua') ~= 0 then
 		for _, fn in ipairs(dofile(dir .. 'session.lua')) do
@@ -142,7 +132,6 @@ SPM.load = function()
 	if SPM.config.post_load_fn then
 		SPM.config.post_load_fn()
 	end
-	echo("Loaded")
 end
 
 SPM.save = function()
@@ -179,11 +168,11 @@ SPM.create = function()
 
 	if vim.fn.isdirectory(dir) == 0 then
 		vim.fn.mkdir(dir, 'p')
-		writefile(dir .. '.gitignore', 'session.lua\nshada\n')
+		write_file(dir .. '.gitignore', 'session.lua\nshada\nviews\n')
 	end
 
 	if vim.fn.filereadable(dir .. 'init.lua') == 0 then
-		writefile(dir .. 'init.lua', 'return {}\n')
+		write_file(dir .. 'init.lua', 'return {}\n')
 	end
 
 	SPM.save()
@@ -216,7 +205,6 @@ local function init(cfg)
 		desc = '[SPM] auto save session on exit',
 		group = group,
 		callback = function()
-			exiting = true
 			SPM.save()
 		end
 	})
@@ -224,6 +212,13 @@ local function init(cfg)
 	if cfg.keys.create ~= '' then
 		vim.keymap.set('n', cfg.keys.create, SPM.create, { desc = '[SPM] create / init project' })
 	end
+
+	vim.api.nvim_create_autocmd('UIEnter', {
+		group = group,
+		callback = function()
+			vim.defer_fn(SPM.load, 250)
+		end
+	})
 
 	return cfg
 end
@@ -243,6 +238,5 @@ SPM.setup = function(config)
 	cfg.dir = vim.fs.normalize(cfg.dir) .. "/"
 
 	SPM.config = init(cfg)
-	vim.defer_fn(SPM.load, 250)
 end
 return SPM
