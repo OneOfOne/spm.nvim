@@ -24,7 +24,7 @@ Install the plugin with your preferred package manager:
 		dir = '.nvim',
 		set_cwd = true,
 		use_views = true,
-		views_local_only = true,
+		local_only = true, -- don't save views / files unless they're in the project
 		use_shada = true,
 		keys = {
 			create = '<leader>pc',

@@ -23,7 +23,7 @@ local function open_file(fn)
 end
 
 local function is_local_file(fn) 
-	if not SPM.config.save_local_only then
+	if not SPM.config.local_only then
 		return vim.fn.filereadable(fn) ~= 0
 	end
 	local dir = SPM.config.dir
@@ -44,7 +44,7 @@ local default_config = {
 	dir = '.nvim',
 	set_cwd = true,
 	use_views = true,
-	save_local_only = true,
+	local_only = true,
 	use_shada = true,
 	keys = {
 		create = '<leader>pc',
@@ -91,7 +91,7 @@ SPM.load = function()
 			end
 
 		})
-		
+
 		vim.api.nvim_create_autocmd('BufWinLeave', {
 			group = group,
 			pattern = '?*',
