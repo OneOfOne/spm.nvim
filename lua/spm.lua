@@ -1,10 +1,9 @@
 local pp = require('plenary.path')
 local group = vim.api.nvim_create_augroup('SPM', {})
 
-local SPM = {
-	config = {},
-	files = {}
-}
+local function starts_with(s, substring)
+	return (s:sub(1,#substring) == substring)
+end
 
 local function tbl_remove(tbl, val)
 	for i = #tbl, 1, -1 do
@@ -15,20 +14,26 @@ local function tbl_remove(tbl, val)
 	return tbl
 end
 
+local SPM = {
+	config = {},
+	files = {}
+}
 
 local function open_file(fn)
 	if vim.fn.filereadable(fn) ~= 0 then
-		vim.cmd('e ' .. fn)
+		vim.schedule(function()
+			vim.cmd('e ' .. fn)
+		end)
 	end
 end
 
-local function is_local_file(fn) 
+local function is_local_file(fn)
 	if not SPM.config.local_only then
 		return vim.fn.filereadable(fn) ~= 0
 	end
 	local dir = SPM.config.dir
 	local ldir = dir:gsub('.nvim/$', '')
-	return fn:find(ldir) ~= nil
+	return starts_with(fn, ldir) ~= nil
 end
 
 local function write_file(fn, text)
@@ -111,6 +116,7 @@ SPM.load = function()
 			if is_local_file(args.match) then
 				tbl_remove(SPM.files, args.match)
 				table.insert(SPM.files, args.match)
+				SPM.save()
 			end
 		end
 	})
@@ -136,12 +142,10 @@ end
 
 SPM.save = function()
 	local dir = SPM.config.dir
-
 	if vim.fn.isdirectory(dir) == 0 then
 		return
 	end
 
-	vim.cmd('wshada!')
 	local file = io.open(dir .. 'session.lua', 'w')
 
 	if not file then
@@ -153,7 +157,6 @@ SPM.save = function()
 	local ldir = dir:gsub('.nvim/$', '')
 	for _, fname in ipairs(SPM.files) do
 		local name = '.' .. string.sub(fname, ldir:len())
-		vim.notify(name, 1)
 		if vim.fn.filereadable(name) ~= 0 then
 			file:write('\t"' .. name .. '",\n')
 		end
