@@ -116,7 +116,6 @@ SPM.load = function()
 			if is_local_file(args.match) then
 				tbl_remove(SPM.files, args.match)
 				table.insert(SPM.files, args.match)
-				SPM.save()
 			end
 		end
 	})
