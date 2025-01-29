@@ -61,6 +61,8 @@ local default_config = {
 	open_file_fn = open_file
 }
 
+local exiting = false
+
 SPM.load = function()
 	local dir = SPM.config.dir
 
@@ -90,7 +92,7 @@ SPM.load = function()
 			group = group,
 			pattern = '?*',
 			callback = function(args)
-				if is_local_file(args.match) then
+				if not exiting and is_local_file(args.match) then
 					vim.cmd('silent! loadview')
 				end
 			end
@@ -101,7 +103,7 @@ SPM.load = function()
 			group = group,
 			pattern = '?*',
 			callback = function(args)
-				if is_local_file(args.match) then
+				if not exiting and is_local_file(args.match) then
 					vim.cmd.mkview()
 				end
 			end
@@ -113,7 +115,7 @@ SPM.load = function()
 		group = group,
 		pattern = '?*',
 		callback = function(args)
-			if is_local_file(args.match) then
+			if not exiting and is_local_file(args.match) then
 				tbl_remove(SPM.files, args.match)
 				table.insert(SPM.files, args.match)
 			end
@@ -124,7 +126,9 @@ SPM.load = function()
 		group = group,
 		pattern = '?*',
 		callback = function(args)
-			tbl_remove(SPM.files, args.match)
+			if not exiting and is_local_file(args.match) then
+				tbl_remove(SPM.files, args.match)
+			end
 		end
 	})
 
@@ -191,7 +195,6 @@ local function init_cwd()
 			end
 		end
 	end
-	print(dir)
 	if dir ~= '' then
 		dir = pp:new(dir):absolute()
 		vim.api.nvim_set_current_dir(dir)
@@ -207,6 +210,7 @@ local function init(cfg)
 		desc = '[SPM] auto save session on exit',
 		group = group,
 		callback = function()
+			exiting = true
 			SPM.save()
 		end
 	})
