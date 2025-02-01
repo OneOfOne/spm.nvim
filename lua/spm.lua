@@ -80,6 +80,8 @@ SPM.load = function()
 
 	local cfg = SPM.config
 
+	vim.api.nvim_set_current_win(1000) -- focus the main window
+
 	if cfg.use_shada then
 		vim.opt.shadafile = dir .. 'shada'
 		vim.cmd('silent! rshada')
